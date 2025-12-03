@@ -34,79 +34,81 @@ const ProjectGallery = () => {
   const modalContainer = useRef(null);
   const cursorLabel = useRef(null);
   
-  // حفظ مكان الماوس
-  const mousePos = useRef({ x: 0, y: 0 });
+  // حفظ إحداثيات الماوس (Target)
+  const mouse = useRef({ x: 0, y: 0 });
+  // حفظ إحداثيات الصورة الحالية (Current)
+  const delayedMouse = useRef({ x: 0, y: 0 });
 
-  useGSAP(() => {
-    // 1. إعدادات أولية
-    gsap.set(modalContainer.current, { scale: 0, opacity: 0, xPercent: -50, yPercent: -50 });
-    gsap.set(cursorLabel.current, { scale: 0, opacity: 0, xPercent: -50, yPercent: -50 });
-
-    // 2. دوال الحركة السريعة
-    const xMoveContainer = gsap.quickTo(modalContainer.current, "x", {duration: 0.8, ease: "power3"});
-    const yMoveContainer = gsap.quickTo(modalContainer.current, "y", {duration: 0.8, ease: "power3"});
-    const xMoveCursor = gsap.quickTo(cursorLabel.current, "x", {duration: 0.5, ease: "power3"});
-    const yMoveCursor = gsap.quickTo(cursorLabel.current, "y", {duration: 0.5, ease: "power3"});
-
-    // 3. تحديث الحركة
+  // 1. إدارة حركة الماوس وحلقة الأنيميشن (Ticker)
+  useEffect(() => {
+    // دالة تحديث مكان الماوس فقط
     const handleMouseMove = (e) => {
-      const { clientX, clientY } = e;
-      mousePos.current = { x: clientX, y: clientY };
+      mouse.current = { x: e.clientX, y: e.clientY };
+    };
+
+    // دالة التحريك الناعم (Lerp) - بتشتغل 60 مرة في الثانية
+    const animate = () => {
+      // معادلة النعومة: بنحرك العنصر مسافة 10% بس ناحية الماوس في كل فريم
+      // ده اللي بيعمل الـ Smooth Delay
+      const ease = 0.1; // قلل الرقم ده لو عايزها أبطأ وأنعم (مثلاً 0.05)
       
-      xMoveContainer(clientX);
-      yMoveContainer(clientY);
-      xMoveCursor(clientX);
-      yMoveCursor(clientY);
+      delayedMouse.current.x += (mouse.current.x - delayedMouse.current.x) * ease;
+      delayedMouse.current.y += (mouse.current.y - delayedMouse.current.y) * ease;
+
+      // تطبيق الحركة مباشرة على العناصر لو موجودة
+      if (modalContainer.current) {
+        gsap.set(modalContainer.current, { 
+            x: delayedMouse.current.x, 
+            y: delayedMouse.current.y,
+            xPercent: -50, 
+            yPercent: -50 
+        });
+      }
+      if (cursorLabel.current) {
+        gsap.set(cursorLabel.current, { 
+            x: delayedMouse.current.x, 
+            y: delayedMouse.current.y,
+            xPercent: -50, 
+            yPercent: -50 
+        });
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
+    // بنضيف الدالة للـ Ticker بتاع GSAP
+    gsap.ticker.add(animate);
 
-    ScrollTrigger.create({
-      trigger: containerRef.current,
-      start: "top bottom",
-      end: "bottom top",
-      onLeave: () => {
-        setActiveImage(null);
-        gsap.to([modalContainer.current, cursorLabel.current], { scale: 0, opacity: 0, duration: 0.2, overwrite: true });
-      },
-      onLeaveBack: () => {
-        setActiveImage(null);
-        gsap.to([modalContainer.current, cursorLabel.current], { scale: 0, opacity: 0, duration: 0.2, overwrite: true });
-      }
-    });
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      gsap.ticker.remove(animate);
+    };
+  }, []);
 
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-
-  }, { scope: containerRef });
-
-  // 4. التحكم في الظهور والاختفاء
+  // 2. إدارة الظهور والاختفاء (Scale & Opacity)
   useGSAP(() => {
     if (activeImage) {
-      // إظهار ناعم
-      gsap.to(modalContainer.current, { scale: 1, opacity: 1, duration: 0.4, ease: "power2.out", overwrite: "auto" });
-      gsap.to(cursorLabel.current, { scale: 1, opacity: 1, duration: 0.4, delay: 0.1, ease: "power2.out", overwrite: "auto" });
+      gsap.to(modalContainer.current, { scale: 1, opacity: 1, duration: 0.4, ease: "power2.out", overwrite: true });
+      gsap.to(cursorLabel.current, { scale: 1, opacity: 1, duration: 0.4, delay: 0.1, ease: "power2.out", overwrite: true });
     } else {
-      // إخفاء ناعم
-      gsap.to(modalContainer.current, { scale: 0, opacity: 0, duration: 0.3, ease: "power2.in", overwrite: "auto" });
-      gsap.to(cursorLabel.current, { scale: 0, opacity: 0, duration: 0.3, ease: "power2.in", overwrite: "auto" });
+      gsap.to(modalContainer.current, { scale: 0, opacity: 0, duration: 0.3, ease: "power2.in", overwrite: true });
+      gsap.to(cursorLabel.current, { scale: 0, opacity: 0, duration: 0.3, ease: "power2.in", overwrite: true });
     }
   }, [activeImage]);
 
-  const handleMouseEnter = (image, e) => {
+  // 3. منع القفزة عند دخول الماوس
+  const handleMouseEnter = (image) => {
     setActiveImage(image);
-    // نقل فوري لمكان الماوس الحالي لمنع القفزة
-    gsap.set(modalContainer.current, { x: e.clientX, y: e.clientY, xPercent: -50, yPercent: -50 });
-    gsap.set(cursorLabel.current, { x: e.clientX, y: e.clientY, xPercent: -50, yPercent: -50 });
+    // حركة ذكية: بنخلي العنصر "ينط" لمكان الماوس الحالي فوراً عشان ميبدأش من الصفر
+    delayedMouse.current.x = mouse.current.x;
+    delayedMouse.current.y = mouse.current.y;
   };
 
   return (
     <section ref={containerRef} className="py-32 w-full bg-[#0a0a0a] relative z-10">
       
-      {/* 🔥 Preload Images (حل سحري للتقطيع) 🔥 */}
+      {/* Preload للصور عشان متهنجش */}
       <div className="hidden">
-        {projects.map((project, i) => (
-            <img key={i} src={project.image} alt="preload" />
-        ))}
+        {projects.map((p, i) => <img key={i} src={p.image} alt="" />)}
       </div>
 
       <div className="container mx-auto px-4 mb-20">
@@ -119,7 +121,7 @@ const ProjectGallery = () => {
           <div 
             key={index}
             className="group flex justify-between items-center py-16 px-4 md:px-20 border-b border-gray-800 cursor-pointer hover:bg-[#111] transition-colors duration-300 relative"
-            onMouseEnter={(e) => handleMouseEnter(project.image, e)}
+            onMouseEnter={() => handleMouseEnter(project.image)}
             onMouseLeave={() => setActiveImage(null)}
           >
             <h2 className="text-4xl md:text-7xl font-bold text-gray-300 group-hover:text-white group-hover:-translate-x-4 transition-all duration-500 ease-in-out">
@@ -132,9 +134,7 @@ const ProjectGallery = () => {
         ))}
       </div>
 
-      {/* 🔥 will-change-transform: بتخلي المتصفح يجهز ال GPU للحركة 
-         🔥 pointer-events-none: عشان الماوس ميخبطش في الصورة وهي بتتحرك
-      */}
+      {/* العناصر العائمة */}
       <div 
         ref={modalContainer} 
         className="fixed top-0 left-0 h-[300px] w-[400px] bg-white pointer-events-none overflow-hidden z-20 rounded-lg shadow-2xl will-change-transform"
