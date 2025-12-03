@@ -33,31 +33,35 @@ const ProjectGallery = () => {
   const containerRef = useRef(null);
   const modalContainer = useRef(null);
   const cursorLabel = useRef(null);
+  
+  // 1. إضافة Ref عشان نحفظ مكان الماوس دايماً حتى لو مفيش هوفر
+  const mousePos = useRef({ x: 0, y: 0 });
 
   useGSAP(() => {
-    // 1. إعدادات أولية:
-    // شيلنا hidden فبقا لازم نضمن إنهم مخفيين بـ Opacity من البداية
+    // إعدادات أولية
     gsap.set(modalContainer.current, { scale: 0, opacity: 0, xPercent: -50, yPercent: -50 });
     gsap.set(cursorLabel.current, { scale: 0, opacity: 0, xPercent: -50, yPercent: -50 });
 
-    // 2. دوال الحركة
     const xMoveContainer = gsap.quickTo(modalContainer.current, "x", {duration: 0.8, ease: "power3"});
     const yMoveContainer = gsap.quickTo(modalContainer.current, "y", {duration: 0.8, ease: "power3"});
-    
     const xMoveCursor = gsap.quickTo(cursorLabel.current, "x", {duration: 0.5, ease: "power3"});
     const yMoveCursor = gsap.quickTo(cursorLabel.current, "y", {duration: 0.5, ease: "power3"});
 
-    // 3. دالة تحريك الماوس
     const handleMouseMove = (e) => {
-      xMoveContainer(e.clientX);
-      yMoveContainer(e.clientY);
-      xMoveCursor(e.clientX);
-      yMoveCursor(e.clientY);
+      const { clientX, clientY } = e;
+      
+      // 2. بنسجل مكان الماوس في الـ Ref
+      mousePos.current = { x: clientX, y: clientY };
+
+      // تحريك العناصر
+      xMoveContainer(clientX);
+      yMoveContainer(clientY);
+      xMoveCursor(clientX);
+      yMoveCursor(clientY);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
 
-    // 4. ScrollTrigger للمراقبة
     ScrollTrigger.create({
       trigger: containerRef.current,
       start: "top bottom",
@@ -76,9 +80,15 @@ const ProjectGallery = () => {
 
   }, { scope: containerRef });
 
-  // 5. مراقبة الهوفر
+  // 3. مراقبة الهوفر (التريك هنا!)
   useGSAP(() => {
     if (activeImage) {
+      // 🔥 نقل فوري لمكان الماوس قبل ما نظهر العنصر 🔥
+      // ده بيمنع إنه يظهر فوق عالشمال
+      gsap.set(modalContainer.current, { x: mousePos.current.x, y: mousePos.current.y });
+      gsap.set(cursorLabel.current, { x: mousePos.current.x, y: mousePos.current.y });
+
+      // بعدين نظهره
       gsap.to(modalContainer.current, { scale: 1, opacity: 1, duration: 0.4, ease: "power2.out", overwrite: "auto" });
       gsap.to(cursorLabel.current, { scale: 1, opacity: 1, duration: 0.4, delay: 0.1, ease: "power2.out", overwrite: "auto" });
     } else {
@@ -113,9 +123,6 @@ const ProjectGallery = () => {
         ))}
       </div>
 
-      {/* التعديل هنا: شيلنا hidden و md:block 
-         وخليناها موجودة دايماً بس GSAP هو اللي بيتحكم في ظهورها
-      */}
       <div 
         ref={modalContainer} 
         className="fixed top-0 left-0 h-[300px] w-[400px] bg-white pointer-events-none overflow-hidden z-20 rounded-lg shadow-2xl"
